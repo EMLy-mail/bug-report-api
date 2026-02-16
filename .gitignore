@@ -140,3 +140,7 @@ dist
 # IDEs
 .idea/
 .vscode/
+
+# Bun lock file
+bun.lockb
+bun.lock
