@@ -1,0 +1,85 @@
+services:
+  mysql:
+    image: mysql:lts
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-emly_bugreports}
+      MYSQL_USER: ${MYSQL_USER:-emly}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      emly:
+        ipv4_address: 172.16.32.2
+
+  api:
+    build: .
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-emly}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-emly_bugreports}
+      API_KEY: ${API_KEY}
+      ADMIN_KEY: ${ADMIN_KEY}
+      PORT: 3000
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-5}
+      RATE_LIMIT_WINDOW_HOURS: ${RATE_LIMIT_WINDOW_HOURS:-24}
+    volumes:
+      - ./logs/api:/app/logs
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      emly:
+        ipv4_address: 172.16.32.3
+
+  dashboard:
+    build: ./dashboard
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-emly}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-emly_bugreports}
+    volumes:
+      - ./logs/dashboard:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      emly:
+        ipv4_address: 172.16.32.4
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - api
+      - dashboard
+    restart: unless-stopped
+    networks:
+      emly:
+        ipv4_address: 172.16.32.5
+
+volumes:
+  mysql_data:
+
+networks:
+  emly:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.32.0/24
+          gateway: 172.16.32.1
