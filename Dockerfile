@@ -9,4 +9,5 @@ COPY src/ ./src/
 
 EXPOSE 3000
 
-CMD ["bun", "run", "src/index.ts"]
+# Use a small startup script that waits for MySQL to be ready
+CMD ["bun", "run", "src/wait-for-mysql.ts"]

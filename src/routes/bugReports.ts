@@ -28,7 +28,7 @@ export const bugReportRoutes = new Elysia({ prefix: "/api/bug-reports" })
 
       Log("BUGREPORT", `Received from name=${name} hwid=${hwid || "none"} ip=${submitterIp}`);
 
-      // Parse system_info — may arrive as a JSON string or already-parsed object
+      // Parse system_info - may arrive as a JSON string or already-parsed object
       let systemInfo: Record<string, unknown> | null = null;
       if (system_info) {
         if (typeof system_info === "string") {

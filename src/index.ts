@@ -6,6 +6,8 @@ import { bugReportRoutes } from "./routes/bugReports";
 import { adminRoutes } from "./routes/admin";
 import { initLogger, Log } from "./logger";
 
+const INSTANCE_ID = process.env.HOSTNAME + "_" + Math.random().toString(16).slice(2, 6);
+
 // Initialize logger
 initLogger();
 
@@ -13,7 +15,12 @@ initLogger();
 validateConfig();
 
 // Run database migrations
-await runMigrations();
+try {
+  await runMigrations();
+} catch (error) {
+  Log("ERROR", "Failed to run migrations:", error);
+  process.exit(1);
+}
 
 const app = new Elysia()
   .onRequest(({ request }) => {
@@ -22,7 +29,7 @@ const app = new Elysia()
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
       "unknown";
-    Log("HTTP", `${request.method} ${url.pathname} from ${ip}`);
+    Log("HTTP", `[${INSTANCE_ID}] ${request.method} ${url.pathname} from ${ip}`);
   })
   .onAfterResponse(({ request, set }) => {
     const url = new URL(request.url);
@@ -33,11 +40,13 @@ const app = new Elysia()
     set.status = 500;
     return { success: false, message: "Internal server error" };
   })
-  .get("/health", () => ({ status: "ok", timestamp: new Date().toISOString() }))
+  .get("/health", () => ({ status: "ok", instance: INSTANCE_ID, timestamp: new Date().toISOString() }))
+  .get("/", () => ({ status: "ok", message: "API is running" }))
   .use(bugReportRoutes)
   .use(adminRoutes)
   .listen({
     port: config.port,
+    //@ts-ignore
     maxBody: 50 * 1024 * 1024, // 50MB
   });
 

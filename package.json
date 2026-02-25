@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "bun run --watch src/index.ts",
-    "start": "bun run src/index.ts"
+    "start": "bun run src/index.ts",
+    "start:wait": "bun run src/wait-for-mysql.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

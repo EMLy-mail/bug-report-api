@@ -33,7 +33,7 @@ export async function runMigrations(): Promise<void> {
     try {
       await pool.execute(migration);
     } catch {
-      // Column/index already exists — safe to ignore
+      // Column/index already exists - safe to ignore
     }
   }
 
