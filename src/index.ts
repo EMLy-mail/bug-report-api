@@ -4,6 +4,7 @@ import { runMigrations } from "./db/migrate";
 import { closePool } from "./db/connection";
 import { bugReportRoutes } from "./routes/bugReports";
 import { adminRoutes } from "./routes/admin";
+import { authRoutes } from "./routes/auth";
 import { initLogger, Log } from "./logger";
 
 const INSTANCE_ID = process.env.HOSTNAME + "_" + Math.random().toString(16).slice(2, 6);
@@ -35,7 +36,16 @@ const app = new Elysia()
     const url = new URL(request.url);
     Log("HTTP", `${request.method} ${url.pathname} -> ${set.status ?? 200}`);
   })
-  .onError(({ error, set }) => {
+  .onError(({ error, set, code }) => {
+    console.error("Error processing request:", error);
+    if (code === "NOT_FOUND") {
+      set.status = 404;
+      return { success: false, message: "Not found" };
+    }
+    if (code === "VALIDATION") {
+      set.status = 422;
+      return { success: false, message: "Validation error" };
+    }
     Log("ERROR", "Unhandled error:", error);
     set.status = 500;
     return { success: false, message: "Internal server error" };
@@ -43,6 +53,7 @@ const app = new Elysia()
   .get("/health", () => ({ status: "ok", instance: INSTANCE_ID, timestamp: new Date().toISOString() }))
   .get("/", () => ({ status: "ok", message: "API is running" }))
   .use(bugReportRoutes)
+  .use(authRoutes)
   .use(adminRoutes)
   .listen({
     port: config.port,

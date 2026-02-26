@@ -1,4 +1,5 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
+import JSZip from "jszip";
 import { getPool } from "../db/connection";
 import type {
   BugReport,
@@ -65,18 +66,30 @@ export async function listBugReports(opts: {
   page: number;
   pageSize: number;
   status?: BugReportStatus;
+  search?: string;
 }): Promise<PaginatedResponse<BugReportListItem>> {
   const pool = getPool();
-  const { page, pageSize, status } = opts;
+  const { page, pageSize, status, search } = opts;
   const offset = (page - 1) * pageSize;
 
-  let whereClause = "";
+  const conditions: string[] = [];
   const params: unknown[] = [];
 
   if (status) {
-    whereClause = "WHERE br.status = ?";
+    conditions.push("br.status = ?");
     params.push(status);
   }
+
+  if (search) {
+    const like = `%${search}%`;
+    conditions.push(
+      "(br.hostname LIKE ? OR br.os_user LIKE ? OR br.name LIKE ? OR br.email LIKE ?)"
+    );
+    params.push(like, like, like, like);
+  }
+
+  const whereClause =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const [countRows] = await pool.execute<RowDataPacket[]>(
     `SELECT COUNT(*) as total FROM bug_reports br ${whereClause}`,
@@ -91,8 +104,8 @@ export async function listBugReports(opts: {
      ${whereClause}
      GROUP BY br.id
      ORDER BY br.created_at DESC
-     LIMIT ? OFFSET ?`,
-    [...params, pageSize, offset]
+     LIMIT ${pageSize} OFFSET ${offset}`,
+    params
   );
 
   return {
@@ -102,6 +115,65 @@ export async function listBugReports(opts: {
     pageSize,
     totalPages: Math.ceil(total / pageSize),
   };
+}
+
+export async function countNewReports(): Promise<number> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    "SELECT COUNT(*) as count FROM bug_reports WHERE status = 'new'"
+  );
+  return (rows[0] as { count: number }).count;
+}
+
+export async function generateReportZip(reportId: number): Promise<Buffer | null> {
+  const pool = getPool();
+
+  const [reportRows] = await pool.execute<RowDataPacket[]>(
+    "SELECT * FROM bug_reports WHERE id = ?",
+    [reportId]
+  );
+  if ((reportRows as unknown[]).length === 0) return null;
+
+  const report = reportRows[0] as BugReport;
+
+  const [fileRows] = await pool.execute<RowDataPacket[]>(
+    "SELECT * FROM bug_report_files WHERE report_id = ?",
+    [reportId]
+  );
+  const files = fileRows as BugReportFile[];
+
+  const zip = new JSZip();
+
+  const reportText = [
+    `Bug Report #${report.id}`,
+    `========================`,
+    ``,
+    `Name: ${report.name}`,
+    `Email: ${report.email}`,
+    `Hostname: ${report.hostname}`,
+    `OS User: ${report.os_user}`,
+    `HWID: ${report.hwid}`,
+    `IP: ${report.submitter_ip}`,
+    `Status: ${report.status}`,
+    `Created: ${report.created_at.toISOString()}`,
+    `Updated: ${report.updated_at.toISOString()}`,
+    ``,
+    `Description:`,
+    `------------`,
+    report.description,
+    ``,
+    ...(report.system_info
+      ? [`System Info:`, `------------`, JSON.stringify(report.system_info, null, 2)]
+      : []),
+  ].join("\n");
+
+  zip.file("report.txt", reportText);
+
+  for (const file of files) {
+    zip.file(`${file.file_role}/${file.filename}`, file.data as Buffer);
+  }
+
+  return zip.generateAsync({ type: "nodebuffer" }) as Promise<Buffer>;
 }
 
 export async function getBugReport(
