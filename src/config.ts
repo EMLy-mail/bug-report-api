@@ -6,6 +6,13 @@ export const config = {
     password: process.env.MYSQL_PASSWORD || "",
     database: process.env.MYSQL_DATABASE || "emly_bugreports",
   },
+  testing_mysql: {
+    host: process.env.TESTING_MYSQL_HOST || "localhost",
+    port: parseInt(process.env.TESTING_MYSQL_PORT || "3306"),
+    user: process.env.TESTING_MYSQL_USER || "emly",
+    password: process.env.TESTING_MYSQL_PASSWORD || "",
+    database: process.env.TESTING_MYSQL_DATABASE || "emly_bugreports",
+  },
   apiKey: process.env.API_KEY || "",
   adminKey: process.env.ADMIN_KEY || "",
   port: parseInt(process.env.PORT || "3000"),
@@ -13,12 +20,14 @@ export const config = {
     max: parseInt(process.env.RATE_LIMIT_MAX || "5"),
     windowHours: parseInt(process.env.RATE_LIMIT_WINDOW_HOURS || "24"),
   },
+  enableTestDB: process.env.ENABLE_TEST_DB === "true",
 } as const;
 
 // Validate required config on startup
 export function validateConfig(): void {
   if (!config.apiKey) throw new Error("API_KEY is required");
   if (!config.adminKey) throw new Error("ADMIN_KEY is required");
-  if (!config.mysql.password)
-    throw new Error("MYSQL_PASSWORD is required");
+  if (!config.mysql.password) throw new Error("MYSQL_PASSWORD is required");
+  if (!config.testing_mysql.password && config.enableTestDB)
+    throw new Error("TESTING_MYSQL_PASSWORD is required");
 }

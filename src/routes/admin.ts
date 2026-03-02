@@ -18,20 +18,34 @@ import {
   getUserById,
 } from "../services/userService";
 import { Log } from "../logger";
-import type { BugReportStatus } from "../types";
+import type { BugReportStatus, DbEnv } from "../types";
 
 export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   .onRequest(adminKeyGuard)
   .get(
     "/bug-reports",
-    async ({ query }) => {
+    async ({ query, headers }) => {
       const page = parseInt(query.page || "1");
       const pageSize = Math.min(parseInt(query.pageSize || "20"), 100);
       const status = query.status as BugReportStatus | undefined;
       const search = query.search || undefined;
+      const useTestDb: boolean = headers["x-db-env"] !== "prod" ? true : false;
 
-      Log("ADMIN", `List bug reports page=${page} pageSize=${pageSize} status=${status || "all"} search=${search || ""}`);
-      return await listBugReports({ page, pageSize, status, search });
+      if (useTestDb) Log("ADMIN", `Fetching bug reports from test database`);
+
+      Log(
+        "ADMIN",
+        `List bug reports page=${page} pageSize=${pageSize} status=${status || "all"} search=${search || ""}`,
+      );
+      return await listBugReports(
+        {
+          page,
+          pageSize,
+          status,
+          search,
+        },
+        useTestDb,
+      );
     },
     {
       query: t.Object({
@@ -43,41 +57,48 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
             t.Literal("in_review"),
             t.Literal("resolved"),
             t.Literal("closed"),
-          ])
+          ]),
         ),
         search: t.Optional(t.String()),
       }),
       detail: { summary: "List bug reports (paginated, filterable)" },
-    }
+    },
   )
   .get(
     "/bug-reports/count",
-    async () => {
-      const count = await countNewReports();
+    async ({ headers }) => {
+      const count = await countNewReports(
+        headers["x-db-env"] !== "prod" ? true : false,
+      );
       return { count };
     },
-    { detail: { summary: "Count new bug reports" } }
+    { detail: { summary: "Count new bug reports" } },
   )
   .get(
     "/bug-reports/:id",
-    async ({ params, status }) => {
+    async ({ params, status, headers }) => {
       Log("ADMIN", `Get bug report id=${params.id}`);
-      const result = await getBugReport(parseInt(params.id));
-      if (!result) return status(404, { success: false, message: "Report not found" });
+      const result = await getBugReport(
+        parseInt(params.id),
+        headers["x-db-env"] !== "prod" ? true : false,
+      );
+      if (!result)
+        return status(404, { success: false, message: "Report not found" });
       return result;
     },
     {
       params: t.Object({ id: t.String() }),
       detail: { summary: "Get bug report with file metadata" },
-    }
+    },
   )
   .patch(
     "/bug-reports/:id/status",
-    async ({ params, body, status }) => {
+    async ({ params, body, status, headers }) => {
       Log("ADMIN", `Update status id=${params.id} status=${body.status}`);
       const updated = await updateBugReportStatus(
         parseInt(params.id),
-        body.status
+        body.status,
+        headers["x-db-env"] !== "prod" ? true : false,
       );
       if (!updated)
         return status(404, { success: false, message: "Report not found" });
@@ -94,12 +115,16 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         ]),
       }),
       detail: { summary: "Update bug report status" },
-    }
+    },
   )
   .get(
     "/bug-reports/:id/files/:fileId",
-    async ({ params, status, set }) => {
-      const file = await getFile(parseInt(params.id), parseInt(params.fileId));
+    async ({ params, status, set, headers }) => {
+      const file = await getFile(
+        parseInt(params.id),
+        parseInt(params.fileId),
+        headers["x-db-env"] !== "prod" ? true : false,
+      );
       if (!file)
         return status(404, { success: false, message: "File not found" });
 
@@ -111,13 +136,16 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
     {
       params: t.Object({ id: t.String(), fileId: t.String() }),
       detail: { summary: "Download a bug report file" },
-    }
+    },
   )
   .get(
     "/bug-reports/:id/download",
-    async ({ params, status, set }) => {
+    async ({ params, status, set, headers }) => {
       Log("ADMIN", `Download zip for report id=${params.id}`);
-      const zipBuffer = await generateReportZip(parseInt(params.id));
+      const zipBuffer = await generateReportZip(
+        parseInt(params.id),
+        headers["x-db-env"] !== "prod" ? true : false,
+      );
       if (!zipBuffer)
         return status(404, { success: false, message: "Report not found" });
 
@@ -130,13 +158,16 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
     {
       params: t.Object({ id: t.String() }),
       detail: { summary: "Download all files for a bug report as ZIP" },
-    }
+    },
   )
   .delete(
     "/bug-reports/:id",
-    async ({ params, status }) => {
+    async ({ params, status, headers }) => {
       Log("ADMIN", `Delete bug report id=${params.id}`);
-      const deleted = await deleteBugReport(parseInt(params.id));
+      const deleted = await deleteBugReport(
+        parseInt(params.id),
+        headers["x-db-env"] !== "prod" ? true : false,
+      );
       if (!deleted)
         return status(404, { success: false, message: "Report not found" });
       return { success: true, message: "Report deleted" };
@@ -144,16 +175,16 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
     {
       params: t.Object({ id: t.String() }),
       detail: { summary: "Delete a bug report and its files" },
-    }
+    },
   )
   // User management
   .get(
     "/users",
-    async () => {
+    async ({ headers }) => {
       Log("ADMIN", "List users");
       return await listUsers();
     },
-    { detail: { summary: "List all users" } }
+    { detail: { summary: "List all users" } },
   )
   .post(
     "/users",
@@ -177,7 +208,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         role: t.Union([t.Literal("admin"), t.Literal("user")]),
       }),
       detail: { summary: "Create a new user" },
-    }
+    },
   )
   .patch(
     "/users/:id",
@@ -195,7 +226,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         enabled: t.Optional(t.Boolean()),
       }),
       detail: { summary: "Update user displayname or enabled status" },
-    }
+    },
   )
   .post(
     "/users/:id/reset-password",
@@ -210,7 +241,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
       params: t.Object({ id: t.String() }),
       body: t.Object({ password: t.String({ minLength: 1 }) }),
       detail: { summary: "Reset a user's password" },
-    }
+    },
   )
   .delete(
     "/users/:id",
@@ -221,7 +252,10 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
       if (!user)
         throw status(404, { success: false, message: "User not found" });
       if (user.role === "admin")
-        return status(400, { success: false, message: "Cannot delete an admin user" });
+        return status(400, {
+          success: false,
+          message: "Cannot delete an admin user",
+        });
 
       const deleted = await deleteUser(params.id);
       if (!deleted)
@@ -231,5 +265,5 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
     {
       params: t.Object({ id: t.String() }),
       detail: { summary: "Delete a user (non-admin only)" },
-    }
+    },
   );

@@ -6,9 +6,12 @@ import { Log } from "../logger";
 const excludedHwids = new Set<string>([
   // Add HWIDs here for development testing
   "95e025d1-7567-462e-9354-ac88b965cd22",
+  "50973d98-7dce-4496-9f9a-fee21655d38a",
 ]);
 
-export const hwidRateLimit = new Elysia({ name: "hwid-rate-limit" }).onBeforeHandle(
+export const hwidRateLimit = new Elysia({
+  name: "hwid-rate-limit",
+}).onBeforeHandle(
   { as: "scoped" },
   // @ts-ignore
   async ({ body, error }) => {
@@ -25,7 +28,7 @@ export const hwidRateLimit = new Elysia({ name: "hwid-rate-limit" }).onBeforeHan
     // Get current rate limit entry
     const [rows] = await pool.execute(
       "SELECT window_start, count FROM rate_limit_hwid WHERE hwid = ?",
-      [hwid]
+      [hwid],
     );
 
     const entries = rows as { window_start: Date; count: number }[];
@@ -34,7 +37,7 @@ export const hwidRateLimit = new Elysia({ name: "hwid-rate-limit" }).onBeforeHan
       // First request from this HWID
       await pool.execute(
         "INSERT INTO rate_limit_hwid (hwid, window_start, count) VALUES (?, ?, 1)",
-        [hwid, now]
+        [hwid, now],
       );
       return {};
     }
@@ -47,7 +50,7 @@ export const hwidRateLimit = new Elysia({ name: "hwid-rate-limit" }).onBeforeHan
       // Window expired, reset
       await pool.execute(
         "UPDATE rate_limit_hwid SET window_start = ?, count = 1 WHERE hwid = ?",
-        [now, hwid]
+        [now, hwid],
       );
       return {};
     }
@@ -65,8 +68,8 @@ export const hwidRateLimit = new Elysia({ name: "hwid-rate-limit" }).onBeforeHan
     // Increment count
     await pool.execute(
       "UPDATE rate_limit_hwid SET count = count + 1 WHERE hwid = ?",
-      [hwid]
+      [hwid],
     );
     return {};
-  }
+  },
 );

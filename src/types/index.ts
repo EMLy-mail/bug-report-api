@@ -55,3 +55,5 @@ export interface PaginatedResponse<T> {
   pageSize: number;
   totalPages: number;
 }
+
+export type DbEnv = "prod" | "test";

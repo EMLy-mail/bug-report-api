@@ -14,11 +14,15 @@ const FILE_ROLES: { field: string; role: FileRole; mime: string }[] = [
 
 export const bugReportRoutes = new Elysia({ prefix: "/api/bug-reports" })
   .onRequest(apiKeyGuard)
-  .use(hwidRateLimit)
+  //.use(hwidRateLimit)
   .post(
     "/",
-    async ({ body, request, set }) => {
-      const { name, email, description, hwid, hostname, os_user, system_info } = body;
+    async ({ body, request, set, headers }) => {
+      console.log(headers);
+      const { name, email, description, hwid, hostname, os_user, system_info } =
+        body;
+      const useTestDB = headers["x-db-env"] !== "prod";
+      console.log("Creating a bug report in the test DB...");
 
       // Get submitter IP from headers or connection
       const submitterIp =
@@ -26,7 +30,10 @@ export const bugReportRoutes = new Elysia({ prefix: "/api/bug-reports" })
         request.headers.get("x-real-ip") ||
         "unknown";
 
-      Log("BUGREPORT", `Received from name=${name} hwid=${hwid || "none"} ip=${submitterIp}`);
+      Log(
+        "BUGREPORT",
+        `Received from name=${name} hwid=${hwid || "none"} ip=${submitterIp}`,
+      );
 
       // Parse system_info - may arrive as a JSON string or already-parsed object
       let systemInfo: Record<string, unknown> | null = null;
@@ -43,31 +50,40 @@ export const bugReportRoutes = new Elysia({ prefix: "/api/bug-reports" })
       }
 
       // Create the bug report
-      const reportId = await createBugReport({
-        name,
-        email,
-        description,
-        hwid: hwid || "",
-        hostname: hostname || "",
-        os_user: os_user || "",
-        submitter_ip: submitterIp,
-        system_info: systemInfo,
-      });
+      const reportId = await createBugReport(
+        {
+          name,
+          email,
+          description,
+          hwid: hwid || "",
+          hostname: hostname || "",
+          os_user: os_user || "",
+          submitter_ip: submitterIp,
+          system_info: systemInfo,
+        },
+        useTestDB,
+      );
 
       // Process file uploads
       for (const { field, role, mime } of FILE_ROLES) {
         const file = body[field as keyof typeof body];
         if (file && file instanceof File) {
           const buffer = Buffer.from(await file.arrayBuffer());
-          Log("BUGREPORT", `File uploaded: role=${role} size=${buffer.length} bytes`);
-          await addFile({
-            report_id: reportId,
-            file_role: role,
-            filename: file.name || `${field}.bin`,
-            mime_type: file.type || mime,
-            file_size: buffer.length,
-            data: buffer,
-          });
+          Log(
+            "BUGREPORT",
+            `File uploaded: role=${role} size=${buffer.length} bytes`,
+          );
+          await addFile(
+            {
+              report_id: reportId,
+              file_role: role,
+              filename: file.name || `${field}.bin`,
+              mime_type: file.type || mime,
+              file_size: buffer.length,
+              data: buffer,
+            },
+            useTestDB,
+          );
         }
       }
 
@@ -103,5 +119,5 @@ export const bugReportRoutes = new Elysia({ prefix: "/api/bug-reports" })
         }),
       },
       detail: { summary: "Submit a bug report" },
-    }
+    },
   );

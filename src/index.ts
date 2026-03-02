@@ -7,7 +7,8 @@ import { adminRoutes } from "./routes/admin";
 import { authRoutes } from "./routes/auth";
 import { initLogger, Log } from "./logger";
 
-const INSTANCE_ID = process.env.HOSTNAME + "_" + Math.random().toString(16).slice(2, 6);
+const INSTANCE_ID =
+  process.env.HOSTNAME + "_" + Math.random().toString(16).slice(2, 6);
 
 // Initialize logger
 initLogger();
@@ -30,15 +31,20 @@ const app = new Elysia()
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
       "unknown";
-    Log("HTTP", `[${INSTANCE_ID}] ${request.method} ${url.pathname} from ${ip}`);
+    if (url.pathname !== "/api/admin/auth/validate")
+      Log(
+        "HTTP",
+        `[${INSTANCE_ID}] ${request.method} ${url.pathname} from ${ip}`,
+      );
   })
   .onAfterResponse(({ request, set }) => {
     const url = new URL(request.url);
-    Log("HTTP", `${request.method} ${url.pathname} -> ${set.status ?? 200}`);
+    if (url.pathname !== "/api/admin/auth/validate")
+      Log("HTTP", `${request.method} ${url.pathname} -> ${set.status ?? 200}`);
   })
   .onError(({ error, set, code }) => {
     console.error("Error processing request:", error);
-    console.log(code)
+    console.log(code);
     if (code === "NOT_FOUND") {
       set.status = 404;
       return { success: false, message: "Not found" };
@@ -51,7 +57,11 @@ const app = new Elysia()
     set.status = 500;
     return { success: false, message: "Internal server error" };
   })
-  .get("/health", () => ({ status: "ok", instance: INSTANCE_ID, timestamp: new Date().toISOString() }))
+  .get("/health", () => ({
+    status: "ok",
+    instance: INSTANCE_ID,
+    timestamp: new Date().toISOString(),
+  }))
   .get("/", () => ({ status: "ok", message: "API is running" }))
   .use(bugReportRoutes)
   .use(authRoutes)
@@ -64,7 +74,7 @@ const app = new Elysia()
 
 Log(
   "SERVER",
-  `EMLy Bug Report API running on http://localhost:${app.server?.port}`
+  `EMLy Bug Report API running on http://localhost:${app.server?.port}`,
 );
 
 // Graceful shutdown

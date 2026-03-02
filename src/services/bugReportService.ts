@@ -10,17 +10,20 @@ import type {
   PaginatedResponse,
 } from "../types";
 
-export async function createBugReport(data: {
-  name: string;
-  email: string;
-  description: string;
-  hwid: string;
-  hostname: string;
-  os_user: string;
-  submitter_ip: string;
-  system_info: Record<string, unknown> | null;
-}): Promise<number> {
-  const pool = getPool();
+export async function createBugReport(
+  data: {
+    name: string;
+    email: string;
+    description: string;
+    hwid: string;
+    hostname: string;
+    os_user: string;
+    submitter_ip: string;
+    system_info: Record<string, unknown> | null;
+  },
+  useTestDb?: boolean,
+): Promise<number> {
+  const pool = getPool(useTestDb ? true : false);
   const [result] = await pool.execute<ResultSetHeader>(
     `INSERT INTO bug_reports (name, email, description, hwid, hostname, os_user, submitter_ip, system_info)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -33,20 +36,23 @@ export async function createBugReport(data: {
       data.os_user,
       data.submitter_ip,
       data.system_info ? JSON.stringify(data.system_info) : null,
-    ]
+    ],
   );
   return result.insertId;
 }
 
-export async function addFile(data: {
-  report_id: number;
-  file_role: FileRole;
-  filename: string;
-  mime_type: string;
-  file_size: number;
-  data: Buffer;
-}): Promise<number> {
-  const pool = getPool();
+export async function addFile(
+  data: {
+    report_id: number;
+    file_role: FileRole;
+    filename: string;
+    mime_type: string;
+    file_size: number;
+    data: Buffer;
+  },
+  useTestDb?: boolean,
+): Promise<number> {
+  const pool = getPool(useTestDb ? true : false);
   const [result] = await pool.execute<ResultSetHeader>(
     `INSERT INTO bug_report_files (report_id, file_role, filename, mime_type, file_size, data)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -57,18 +63,21 @@ export async function addFile(data: {
       data.mime_type,
       data.file_size,
       data.data,
-    ]
+    ],
   );
   return result.insertId;
 }
 
-export async function listBugReports(opts: {
-  page: number;
-  pageSize: number;
-  status?: BugReportStatus;
-  search?: string;
-}): Promise<PaginatedResponse<BugReportListItem>> {
-  const pool = getPool();
+export async function listBugReports(
+  opts: {
+    page: number;
+    pageSize: number;
+    status?: BugReportStatus;
+    search?: string;
+  },
+  useTestDb?: boolean,
+): Promise<PaginatedResponse<BugReportListItem>> {
+  const pool = getPool(useTestDb ? true : false);
   const { page, pageSize, status, search } = opts;
   const offset = (page - 1) * pageSize;
 
@@ -83,7 +92,7 @@ export async function listBugReports(opts: {
   if (search) {
     const like = `%${search}%`;
     conditions.push(
-      "(br.hostname LIKE ? OR br.os_user LIKE ? OR br.name LIKE ? OR br.email LIKE ?)"
+      "(br.hostname LIKE ? OR br.os_user LIKE ? OR br.name LIKE ? OR br.email LIKE ?)",
     );
     params.push(like, like, like, like);
   }
@@ -93,7 +102,6 @@ export async function listBugReports(opts: {
 
   const [countRows] = await pool.execute<RowDataPacket[]>(
     `SELECT COUNT(*) as total FROM bug_reports br ${whereClause}`,
-    params
   );
   const total = (countRows[0] as { total: number }).total;
 
@@ -105,7 +113,6 @@ export async function listBugReports(opts: {
      GROUP BY br.id
      ORDER BY br.created_at DESC
      LIMIT ${pageSize} OFFSET ${offset}`,
-    params
   );
 
   return {
@@ -117,20 +124,23 @@ export async function listBugReports(opts: {
   };
 }
 
-export async function countNewReports(): Promise<number> {
-  const pool = getPool();
+export async function countNewReports(useTestDb?: boolean): Promise<number> {
+  const pool = getPool(useTestDb ? true : false);
   const [rows] = await pool.execute<RowDataPacket[]>(
-    "SELECT COUNT(*) as count FROM bug_reports WHERE status = 'new'"
+    "SELECT COUNT(*) as count FROM bug_reports WHERE status = 'new'",
   );
   return (rows[0] as { count: number }).count;
 }
 
-export async function generateReportZip(reportId: number): Promise<Buffer | null> {
-  const pool = getPool();
+export async function generateReportZip(
+  reportId: number,
+  useTestDb?: boolean,
+): Promise<Buffer | null> {
+  const pool = getPool(useTestDb ? true : false);
 
   const [reportRows] = await pool.execute<RowDataPacket[]>(
     "SELECT * FROM bug_reports WHERE id = ?",
-    [reportId]
+    [reportId],
   );
   if ((reportRows as unknown[]).length === 0) return null;
 
@@ -138,7 +148,7 @@ export async function generateReportZip(reportId: number): Promise<Buffer | null
 
   const [fileRows] = await pool.execute<RowDataPacket[]>(
     "SELECT * FROM bug_report_files WHERE report_id = ?",
-    [reportId]
+    [reportId],
   );
   const files = fileRows as BugReportFile[];
 
@@ -163,7 +173,11 @@ export async function generateReportZip(reportId: number): Promise<Buffer | null
     report.description,
     ``,
     ...(report.system_info
-      ? [`System Info:`, `------------`, JSON.stringify(report.system_info, null, 2)]
+      ? [
+          `System Info:`,
+          `------------`,
+          JSON.stringify(report.system_info, null, 2),
+        ]
       : []),
   ].join("\n");
 
@@ -177,20 +191,21 @@ export async function generateReportZip(reportId: number): Promise<Buffer | null
 }
 
 export async function getBugReport(
-  id: number
+  id: number,
+  useTestDb?: boolean,
 ): Promise<{ report: BugReport; files: Omit<BugReportFile, "data">[] } | null> {
-  const pool = getPool();
+  const pool = getPool(useTestDb ? true : false);
 
   const [reportRows] = await pool.execute<RowDataPacket[]>(
     "SELECT * FROM bug_reports WHERE id = ?",
-    [id]
+    [id],
   );
 
   if ((reportRows as unknown[]).length === 0) return null;
 
   const [fileRows] = await pool.execute<RowDataPacket[]>(
     "SELECT id, report_id, file_role, filename, mime_type, file_size, created_at FROM bug_report_files WHERE report_id = ?",
-    [id]
+    [id],
   );
 
   return {
@@ -201,35 +216,40 @@ export async function getBugReport(
 
 export async function getFile(
   reportId: number,
-  fileId: number
+  fileId: number,
+  useTestDb?: boolean,
 ): Promise<BugReportFile | null> {
-  const pool = getPool();
+  const pool = getPool(useTestDb ? true : false);
   const [rows] = await pool.execute<RowDataPacket[]>(
     "SELECT * FROM bug_report_files WHERE id = ? AND report_id = ?",
-    [fileId, reportId]
+    [fileId, reportId],
   );
 
   if ((rows as unknown[]).length === 0) return null;
   return rows[0] as BugReportFile;
 }
 
-export async function deleteBugReport(id: number): Promise<boolean> {
-  const pool = getPool();
+export async function deleteBugReport(
+  id: number,
+  useTestDb?: boolean,
+): Promise<boolean> {
+  const pool = getPool(useTestDb ? true : false);
   const [result] = await pool.execute<ResultSetHeader>(
     "DELETE FROM bug_reports WHERE id = ?",
-    [id]
+    [id],
   );
   return result.affectedRows > 0;
 }
 
 export async function updateBugReportStatus(
   id: number,
-  status: BugReportStatus
+  status: BugReportStatus,
+  useTestDb?: boolean,
 ): Promise<boolean> {
-  const pool = getPool();
+  const pool = getPool(useTestDb ? true : false);
   const [result] = await pool.execute<ResultSetHeader>(
     "UPDATE bug_reports SET status = ? WHERE id = ?",
-    [status, id]
+    [status, id],
   );
   return result.affectedRows > 0;
 }
