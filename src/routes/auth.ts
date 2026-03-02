@@ -4,7 +4,7 @@ import { loginUser, validateSession, logoutSession } from "../services/authServi
 import { Log } from "../logger";
 
 export const authRoutes = new Elysia({ prefix: "/api/admin/auth" })
-  .use(adminKeyGuard)
+  .onRequest(adminKeyGuard)
   .post(
     "/login",
     async ({ body, error }) => {

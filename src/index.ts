@@ -38,6 +38,7 @@ const app = new Elysia()
   })
   .onError(({ error, set, code }) => {
     console.error("Error processing request:", error);
+    console.log(code)
     if (code === "NOT_FOUND") {
       set.status = 404;
       return { success: false, message: "Not found" };

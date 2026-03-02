@@ -13,7 +13,7 @@ const FILE_ROLES: { field: string; role: FileRole; mime: string }[] = [
 ];
 
 export const bugReportRoutes = new Elysia({ prefix: "/api/bug-reports" })
-  .use(apiKeyGuard)
+  .onRequest(apiKeyGuard)
   .use(hwidRateLimit)
   .post(
     "/",

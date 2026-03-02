@@ -8,7 +8,7 @@ const excludedHwids = new Set<string>([
   "95e025d1-7567-462e-9354-ac88b965cd22",
 ]);
 
-export const hwidRateLimit = new Elysia({ name: "hwid-rate-limit" }).derive(
+export const hwidRateLimit = new Elysia({ name: "hwid-rate-limit" }).onBeforeHandle(
   { as: "scoped" },
   // @ts-ignore
   async ({ body, error }) => {

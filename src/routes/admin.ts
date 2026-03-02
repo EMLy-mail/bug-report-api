@@ -21,7 +21,7 @@ import { Log } from "../logger";
 import type { BugReportStatus } from "../types";
 
 export const adminRoutes = new Elysia({ prefix: "/api/admin" })
-  .use(adminKeyGuard)
+  .onRequest(adminKeyGuard)
   .get(
     "/bug-reports",
     async ({ query }) => {
@@ -60,10 +60,10 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .get(
     "/bug-reports/:id",
-    async ({ params, error }) => {
+    async ({ params, status }) => {
       Log("ADMIN", `Get bug report id=${params.id}`);
       const result = await getBugReport(parseInt(params.id));
-      if (!result) return error(404, { success: false, message: "Report not found" });
+      if (!result) return status(404, { success: false, message: "Report not found" });
       return result;
     },
     {
@@ -73,14 +73,14 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .patch(
     "/bug-reports/:id/status",
-    async ({ params, body, error }) => {
+    async ({ params, body, status }) => {
       Log("ADMIN", `Update status id=${params.id} status=${body.status}`);
       const updated = await updateBugReportStatus(
         parseInt(params.id),
         body.status
       );
       if (!updated)
-        return error(404, { success: false, message: "Report not found" });
+        return status(404, { success: false, message: "Report not found" });
       return { success: true, message: "Status updated" };
     },
     {
@@ -98,10 +98,10 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .get(
     "/bug-reports/:id/files/:fileId",
-    async ({ params, error, set }) => {
+    async ({ params, status, set }) => {
       const file = await getFile(parseInt(params.id), parseInt(params.fileId));
       if (!file)
-        return error(404, { success: false, message: "File not found" });
+        return status(404, { success: false, message: "File not found" });
 
       set.headers["content-type"] = file.mime_type;
       set.headers["content-disposition"] =
@@ -115,11 +115,11 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .get(
     "/bug-reports/:id/download",
-    async ({ params, error, set }) => {
+    async ({ params, status, set }) => {
       Log("ADMIN", `Download zip for report id=${params.id}`);
       const zipBuffer = await generateReportZip(parseInt(params.id));
       if (!zipBuffer)
-        return error(404, { success: false, message: "Report not found" });
+        return status(404, { success: false, message: "Report not found" });
 
       set.headers["content-type"] = "application/zip";
       set.headers["content-disposition"] =
@@ -134,11 +134,11 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .delete(
     "/bug-reports/:id",
-    async ({ params, error }) => {
+    async ({ params, status }) => {
       Log("ADMIN", `Delete bug report id=${params.id}`);
       const deleted = await deleteBugReport(parseInt(params.id));
       if (!deleted)
-        return error(404, { success: false, message: "Report not found" });
+        return status(404, { success: false, message: "Report not found" });
       return { success: true, message: "Report deleted" };
     },
     {
@@ -157,14 +157,14 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .post(
     "/users",
-    async ({ body, error }) => {
+    async ({ body, status }) => {
       Log("ADMIN", `Create user username=${body.username}`);
       try {
         const user = await createUser(body);
         return { success: true, user };
       } catch (err) {
         if (err instanceof Error && err.message === "Username already exists") {
-          return error(409, { success: false, message: err.message });
+          return status(409, { success: false, message: err.message });
         }
         throw err;
       }
@@ -181,11 +181,11 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .patch(
     "/users/:id",
-    async ({ params, body, error }) => {
+    async ({ params, body, status }) => {
       Log("ADMIN", `Update user id=${params.id}`);
       const updated = await updateUser(params.id, body);
       if (!updated)
-        return error(404, { success: false, message: "User not found" });
+        return status(404, { success: false, message: "User not found" });
       return { success: true, message: "User updated" };
     },
     {
@@ -199,11 +199,11 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .post(
     "/users/:id/reset-password",
-    async ({ params, body, error }) => {
+    async ({ params, body, status }) => {
       Log("ADMIN", `Reset password for user id=${params.id}`);
       const updated = await resetPassword(params.id, body.password);
       if (!updated)
-        return error(404, { success: false, message: "User not found" });
+        return status(404, { success: false, message: "User not found" });
       return { success: true, message: "Password reset" };
     },
     {
@@ -214,18 +214,18 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
   )
   .delete(
     "/users/:id",
-    async ({ params, error }) => {
+    async ({ params, status }) => {
       Log("ADMIN", `Delete user id=${params.id}`);
 
       const user = await getUserById(params.id);
       if (!user)
-        return error(404, { success: false, message: "User not found" });
+        throw status(404, { success: false, message: "User not found" });
       if (user.role === "admin")
-        return error(400, { success: false, message: "Cannot delete an admin user" });
+        return status(400, { success: false, message: "Cannot delete an admin user" });
 
       const deleted = await deleteUser(params.id);
       if (!deleted)
-        return error(404, { success: false, message: "User not found" });
+        return status(404, { success: false, message: "User not found" });
       return { success: true, message: "User deleted" };
     },
     {
