@@ -25,7 +25,19 @@ export function Log(source: string, ...args: unknown[]): void {
   const date = now.toISOString().slice(0, 10);
   const time = now.toTimeString().slice(0, 8);
   const msg = args
-    .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+    .map((a) => {
+      if (a instanceof Error) {
+        return `${a.message}${a.stack ? "\n" + a.stack : ""}`;
+      }
+      if (typeof a === "object") {
+        try {
+          return JSON.stringify(a);
+        } catch {
+          return String(a);
+        }
+      }
+      return String(a);
+    })
     .join(" ");
 
   const line = `[${date}] - [${time}] - [${source}] - ${msg}`;

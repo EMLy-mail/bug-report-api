@@ -67,7 +67,6 @@ services:
       - "traefik.http.services.emly-api.loadbalancer.server.port=3000"
     depends_on:
       - emly-mysql-db
-
 volumes:
   mysql-data:
   emly-api-logs:

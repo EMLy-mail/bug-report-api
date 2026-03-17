@@ -55,3 +55,18 @@ export interface PaginatedResponse<T> {
   pageSize: number;
   totalPages: number;
 }
+
+export type DbEnv = "prod" | "test";
+
+export type UnauthorizedResponse = import("elysia").ElysiaCustomStatusResponse<
+  401,
+  { success: false; message: string }
+>;
+
+export interface FeaturesRawJson {
+  [key: string]: { label: string; description: string; key: string };
+}
+
+export interface FeaturesJson {
+  [key: string]: { label: string; description: string; enabled: boolean };
+}

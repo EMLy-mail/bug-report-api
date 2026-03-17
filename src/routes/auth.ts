@@ -1,0 +1,73 @@
+import { Elysia, t } from "elysia";
+import { adminKeyGuard2 } from "../middleware/auth";
+import {
+  loginUser,
+  validateSession,
+  logoutSession,
+} from "../services/authService";
+import { Log } from "../logger";
+
+export const authRoutes = new Elysia({ prefix: "/api/admin/auth" })
+  //.onRequest(adminKeyGuard)
+  .use(adminKeyGuard2)
+  .post(
+    "/login",
+    async ({ body, status }) => {
+      const result = await loginUser(body.username, body.password);
+      if (!result) {
+        Log("AUTH", `Login failed for username=${body.username}`);
+        return status(401, {
+          success: false,
+          message: "Invalid credentials or account disabled",
+        });
+      }
+      return {
+        success: true,
+        session_id: result.session_id,
+        user: result.user,
+      };
+    },
+    {
+      body: t.Object({
+        username: t.String({ minLength: 1 }),
+        password: t.String({ minLength: 1 }),
+      }),
+      detail: { summary: "Login with username/password" },
+    },
+  )
+  .post(
+    "/logout",
+    async ({ headers }) => {
+      const sessionId = headers["x-session-token"];
+      if (sessionId) {
+        await logoutSession(sessionId);
+      }
+      return { success: true, message: "Logged out" };
+    },
+    {
+      detail: { summary: "Logout and invalidate session" },
+    },
+  )
+  .get(
+    "/validate",
+    async ({ headers, status }) => {
+      const sessionId = headers["x-session-token"];
+      if (!sessionId) {
+        return status(401, {
+          success: false,
+          message: "No session token provided",
+        });
+      }
+      const user = await validateSession(sessionId);
+      if (!user) {
+        return status(401, {
+          success: false,
+          message: "Invalid or expired session",
+        });
+      }
+      return { success: true, user };
+    },
+    {
+      detail: { summary: "Validate session and return user" },
+    },
+  );

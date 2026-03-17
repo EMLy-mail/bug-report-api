@@ -1,35 +1,26 @@
-import { Elysia } from "elysia";
 import { config } from "../config";
 import { Log } from "../logger";
+import Elysia from "elysia";
+import type { UnauthorizedResponse } from "../types";
 
-export const apiKeyGuard = new Elysia({ name: "api-key-guard" }).derive(
+export const apiKeyGuard2 = new Elysia({ name: "api-key-guard" }).derive(
   { as: "scoped" },
-  ({ headers, error, request }) => {
-    const key = headers["x-api-key"];
-    if (!key || key !== config.apiKey) {
-      const ip =
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        request.headers.get("x-real-ip") ||
-        "unknown";
-      Log("AUTH", `Invalid API key from ip=${ip}`);
-      return error(401, { success: false, message: "Invalid or missing API key" });
+  ({ headers, status }): UnauthorizedResponse | {} => {
+    const apiKey = headers["x-api-key"];
+    if (!apiKey || apiKey !== config.apiKey) {
+      throw status(401, { success: false as const, message: "Unauthorized API Key" });
     }
     return {};
-  }
+  },
 );
 
-export const adminKeyGuard = new Elysia({ name: "admin-key-guard" }).derive(
+export const adminKeyGuard2 = new Elysia({ name: "admin-key-guard" }).derive(
   { as: "scoped" },
-  ({ headers, error, request }) => {
-    const key = headers["x-admin-key"];
-    if (!key || key !== config.adminKey) {
-      const ip =
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        request.headers.get("x-real-ip") ||
-        "unknown";
-      Log("AUTH", `Invalid admin key from ip=${ip}`);
-      return error(401, { success: false, message: "Invalid or missing admin key" });
+  ({ headers, status }): UnauthorizedResponse | {} => {
+    const apiKey = headers["x-admin-key"];
+    if (!apiKey || apiKey !== config.adminKey) {
+      throw status(401, { success: false as const, message: "Unauthorized Admin Key" });
     }
     return {};
-  }
+  },
 );

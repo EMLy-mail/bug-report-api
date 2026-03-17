@@ -1,0 +1,7 @@
+{
+  "testDb": {
+    "label": "Testing Database",
+    "description": "Accepts bug reports routed to a separate testing database via the x-db-env header",
+    "key": "FLAG_ENABLE_TEST_DB"
+  }
+}
