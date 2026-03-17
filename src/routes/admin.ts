@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { adminKeyGuard } from "../middleware/auth";
+import { adminKeyGuard2 } from "../middleware/auth";
 import {
   listBugReports,
   getBugReport,
@@ -21,7 +21,7 @@ import { Log } from "../logger";
 import type { BugReportStatus, DbEnv } from "../types";
 
 export const adminRoutes = new Elysia({ prefix: "/api/admin" })
-  .onRequest(adminKeyGuard)
+  .use(adminKeyGuard2)
   .get(
     "/bug-reports",
     async ({ query, headers }) => {
@@ -37,7 +37,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         "ADMIN",
         `List bug reports page=${page} pageSize=${pageSize} status=${status || "all"} search=${search || ""}`,
       );
-      return await listBugReports(
+      const res = await listBugReports(
         {
           page,
           pageSize,
@@ -46,6 +46,7 @@ export const adminRoutes = new Elysia({ prefix: "/api/admin" })
         },
         useTestDb,
       );
+      return res;
     },
     {
       query: t.Object({

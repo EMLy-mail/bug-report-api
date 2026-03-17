@@ -7,7 +7,7 @@ let pool: mysql.Pool | null = null;
 export function getPool(useTestDb?: boolean): mysql.Pool {
   if (!pool) {
     if (useTestDb && config.enableTestDB) {
-      Log("db", "using test db");
+      Log("DB", "Using Test DB Pool Connection");
       return mysql.createPool({
         host: config.testing_mysql.host,
         port: config.testing_mysql.port,
@@ -33,7 +33,7 @@ export function getPool(useTestDb?: boolean): mysql.Pool {
     });
   }
   if (useTestDb && config.enableTestDB) {
-    Log("db", "using test db");
+    Log("DB", "Using Test DB Pool Connection");
     return mysql.createPool({
       host: config.testing_mysql.host,
       port: config.testing_mysql.port,

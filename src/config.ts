@@ -20,7 +20,7 @@ export const config = {
     max: parseInt(process.env.RATE_LIMIT_MAX || "5"),
     windowHours: parseInt(process.env.RATE_LIMIT_WINDOW_HOURS || "24"),
   },
-  enableTestDB: process.env.ENABLE_TEST_DB === "true",
+  enableTestDB: process.env.FLAG_ENABLE_TEST_DB === "true",
 } as const;
 
 // Validate required config on startup

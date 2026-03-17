@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { adminKeyGuard } from "../middleware/auth";
+import { adminKeyGuard2 } from "../middleware/auth";
 import {
   loginUser,
   validateSession,
@@ -8,7 +8,8 @@ import {
 import { Log } from "../logger";
 
 export const authRoutes = new Elysia({ prefix: "/api/admin/auth" })
-  .onRequest(adminKeyGuard)
+  //.onRequest(adminKeyGuard)
+  .use(adminKeyGuard2)
   .post(
     "/login",
     async ({ body, status }) => {

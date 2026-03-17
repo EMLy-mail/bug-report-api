@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { apiKeyGuard } from "../middleware/auth";
+import { apiKeyGuard2, adminKeyGuard2 } from "../middleware/auth";
 import { hwidRateLimit } from "../middleware/rateLimit";
 import { createBugReport, addFile } from "../services/bugReportService";
 import { Log } from "../logger";
@@ -13,7 +13,8 @@ const FILE_ROLES: { field: string; role: FileRole; mime: string }[] = [
 ];
 
 export const bugReportRoutes = new Elysia({ prefix: "/api/bug-reports" })
-  .onRequest(apiKeyGuard)
+  //.onRequest(apiKeyGuard)
+  .use(apiKeyGuard2)
   //.use(hwidRateLimit)
   .post(
     "/",

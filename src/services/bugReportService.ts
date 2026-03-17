@@ -207,6 +207,18 @@ export async function getBugReport(
     "SELECT id, report_id, file_role, filename, mime_type, file_size, created_at FROM bug_report_files WHERE report_id = ?",
     [id],
   );
+  // If the report's submitter_ip is "unknown", use the report system_info's InternalIP if available
+  const report = reportRows[0] as BugReport;
+  if (
+    report.submitter_ip === "unknown" &&
+    report.system_info !== null &&
+    typeof report.system_info === "object" &&
+    "InternalIP" in report.system_info
+  ) {
+    report.submitter_ip = report.system_info.InternalIP as string;
+  }
+
+  console.log("Fetched report:", reportRows[0]);
 
   return {
     report: reportRows[0] as BugReport,
